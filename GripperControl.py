@@ -210,39 +210,77 @@ class FindTrajectory:
             actions.append([round(i, 5) for i in action])
         return actions
 
-    def trajectory_to_acions_teleport(self, nodes: [Node]) -> [[float]]:
-        optimal_trajectory = nodes
-        actions = []
-        while len(optimal_trajectory) != 1:
-            cur = optimal_trajectory.pop(0).pos
-            next_node_pos = optimal_trajectory[0].pos
-            action = [(next_node_pos[0] - cur[0]), (next_node_pos[1] - cur[1]), (next_node_pos[2] - cur[2])]
-            # limits the action to the max step size
-            if np.linalg.norm(action) > (self.step_size * 16) and self.distance_pruned:
-                action = [((self.step_size * 16) / np.linalg.norm(action)) * i for i in action]
-            if self.gripper_closed:
-                action.append(1)
-            else:
-                action.append(-1)
-            actions.append([round(i, 5) for i in action])
-        return actions
+    # def trajectory_to_acions_teleport(self, nodes: [Node]) -> [[float]]:
+    #     optimal_trajectory = nodes
+    #     actions = []
+    #     while len(optimal_trajectory) != 1:
+    #         cur = optimal_trajectory.pop(0).pos
+    #         next_node_pos = optimal_trajectory[0].pos
+    #         action = [(next_node_pos[0] - cur[0]), (next_node_pos[1] - cur[1]), (next_node_pos[2] - cur[2])]
+    #         # limits the action to the max step size
+    #         if np.linalg.norm(action) > (self.step_size * 16) and self.distance_pruned:
+    #             action = [((self.step_size * 16) / np.linalg.norm(action)) * i for i in action]
+    #             # Check if the new action can be reached
+    #             if self.obstacles and self.obstacles.collides_at_time_step(
+    #                 [cur[0]+action[0], cur[1]+action[1], cur[2]+action[2]], 0, self.safety_margin):
+    #                 return []
+    #         if self.gripper_closed:
+    #             action.append(1)
+    #         else:
+    #             action.append(-1)
+    #         actions.append([round(i, 5) for i in action])
+    #     return actions
 
+    # def teleporting_search(self):
+    #     # Create start node
+    #     start_node = Node(None, self.start_pos)
+    #     self.safety_margin = self.og_safety_margin
+    #     if self.obstacles and self.obstacles.collides_at_time_step(start_node.pos, 0, self.safety_margin):
+    #         self.safety_margin = 0.02
+    #     # create subgoal_pos as node
+    #     goal_node = Node(start_node, self.goal_pos)
+    #     if self.node_is_reachable(goal_node) and \
+    #             (self.obstacles is None
+    #              or not self.obstacles.collides_at_time_step(goal_node.pos, goal_node.depth, self.safety_margin)):
+    #         # we could find a path so return it
+    #         path = [goal_node, start_node] # TODO: split this in a straight path with step length 0.01
+    #         return self.trajectory_to_acions_teleport(path[::-1])  # Return reversed path
+    #     else:
+    #         return []
+    
     def teleporting_search(self):
-        # Create start  node
+        # Create start node
         start_node = Node(None, self.start_pos)
         self.safety_margin = self.og_safety_margin
         if self.obstacles and self.obstacles.collides_at_time_step(start_node.pos, 0, self.safety_margin):
             self.safety_margin = 0.02
+
         # create subgoal_pos as node
         goal_node = Node(start_node, self.goal_pos)
         if self.node_is_reachable(goal_node) and \
                 (self.obstacles is None
-                 or not self.obstacles.collides_at_time_step(goal_node.pos, goal_node.depth, self.safety_margin)):
-            # we could find a path so return it
-            path = [goal_node, start_node]
-            return self.trajectory_to_acions_teleport(path[::-1])  # Return reversed path
+                or not self.obstacles.collides_at_time_step(goal_node.pos, goal_node.depth, self.safety_margin)):
+            # Create intermediate nodes
+            distance = sum([(g - s)**2 for g, s in zip(goal_node.pos, start_node.pos)]) ** 0.5
+            direction_step = [(g - s)/(distance*100) for g, s in zip(goal_node.pos, start_node.pos)]            
+            direction_step_length = sum([x**2 for x in direction_step]) ** 0.5
+            steps = int(distance / direction_step_length)
+            
+            path = [start_node]
+            current_node = start_node
+            
+            for _ in range(min(steps, 16)):
+                # append nodes with parents
+                next_pos = [c + d for c, d in zip(current_node.pos, direction_step)]
+                next_node = Node(current_node, next_pos)
+                path.append(next_node)
+                current_node = next_node
+
+            # return self.trajectory_to_acions_teleport(path[::-1])  # Return reversed path
+            return self.trajectory_to_actions(path)  # Return path (reverse in A*)
         else:
             return []
+
 
     def a_star_search(self):
         # Create start  node

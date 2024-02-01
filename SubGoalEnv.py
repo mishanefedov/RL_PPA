@@ -172,23 +172,23 @@ class SubGoalEnv(gym.Env):
         if self.render_subactions:
             self.env.render()
             time.sleep(0.05)
+        # self.render()
             
-    # def action_is_target_pos(self, subgoal_pos):
-    #     # compute if a given action corresponds to the target position
-    #     target_pos = self.env.getTargetPos().copy()  # get target pos from env
-    #     target_to_obj = (subgoal_pos - target_pos) * np.array([2., 2., 1.])  # scale to emphasize x, y axis
-    #     target_to_obj = np.linalg.norm(target_to_obj)
-    #     if target_to_obj < 0.05:
-    #         return 1
-    #     return 0
+    def action_is_target_pos(self, subgoal_pos):
+        # compute if a given action corresponds to the target position
+        target_pos = self.env._target_pos.copy()  # get target pos from env
+        target_to_obj = (subgoal_pos - target_pos) * np.array([2., 2., 1.])  # scale to emphasize x, y axis
+        target_to_obj = np.linalg.norm(target_to_obj)
+        if target_to_obj < 0.05:
+            return 1
+        return 0
 
     def step(self, action):
-        print("SUBGOAL ENV STEP: actions = ", action)
         start_step = time.time()
         # get kind of action: "hold"=0, "grasp"=1
         action_type = 0
         gripper_closed = True
-        if action[3] > 0:
+        if action[3] > 0: # TODO: this is true in most of the cases (?).
             action_type = 1
             gripper_closed = False
 
@@ -197,7 +197,7 @@ class SubGoalEnv(gym.Env):
         # create initial obs,
         obs, reward, done, info = self.env.step([0, 0, 0, 0])
         # calculate if we want to teleport to the goal pos
-        # action_is_goal = self.action_is_target_pos(sub_goal_pos)
+        action_is_goal = self.action_is_target_pos(sub_goal_pos)
         # open gripper if picking,
         if action_type == 1:
             # actions need to be performed several times, because otherwise we can't guarantee that the gripper is open
@@ -217,7 +217,7 @@ class SubGoalEnv(gym.Env):
         time_in_ppa = st = numbers_no_path_found = time_in_mujoco = total_dis_offset = 0
         # tell info the inital distance between gripper and goal
         distance_to_goal = np.linalg.norm(gripper_pos - sub_goal_pos)
-        initial_pos = gripper_pos
+
         # we check where teleportation would end
         teleport_final_pos = [gripper_pos.tolist()]
         a_star_final_pos = [gripper_pos.tolist()]
@@ -228,9 +228,10 @@ class SubGoalEnv(gym.Env):
             if self.env_name == "obstacle_env":
                 # when obstacle env calculate sub_actions again after every step
                 gripper_pos = obs["observation"][:3]
-                step_size = 0.033
+                # step_size = 0.033
+                step_size = 0.01
                 obstacles = Obstacles(pretty_obs(obs["observation"]), self.env.dt)
-                if self.teleporting:
+                if self.teleporting: # TODO: only the first step of A* is executed (0.033 = step size(?))
                     # measure time spend in A* Search
                     st = time.time()
                     sub_actions = teleport(current_pos=gripper_pos,
@@ -248,23 +249,22 @@ class SubGoalEnv(gym.Env):
                     if sub_actions is None:
                         sub_actions = [[0, 0, 0, -1]]
                     st = time.time()
-                    obs, reward, done, info = self.env.teleport(sub_actions[-1], list(
-                        map(lambda x, y: x + y, gripper_pos, sub_actions[-1])))
+                    # obs, reward, done, info = self.env.teleport(sub_actions[-1], list(
+                    #     map(lambda x, y: x + y, gripper_pos, sub_actions[-1])))
+                    obs, reward, done, info = self.env.step(sub_actions[0]) # Execute first step
+                    self.func_render_subactions()
                     time_in_mujoco += time.time() - st
                 else:
                     if self.teleporting is None:
-                        sub_actions = teleport(current_pos=gripper_pos,
+                        sub_actions_teleport = teleport(current_pos=gripper_pos,
                                                         goal_pos=sub_goal_pos,
                                                         gripper_closed=gripper_closed,
                                                         obstacles=obstacles,
                                                         env_dimension=self.env_dimension,
                                                         step_size=0.01,
                                                         distance_pruned=True)
-                        # print(f"teleport return {sub_actions}")
-                        new_pos = [list(map(lambda x, y: x + y, gripper_pos, sub_actions[-1]))]
-                        # print(f"we want to append {new_pos}")
+                        new_pos = [list(map(lambda x, y: x + y, gripper_pos, sub_actions_teleport[-1]))]
                         teleport_final_pos += new_pos
-                        # print(f"teleport is now {teleport_final_pos}")
                     # measure time spend in A* Search
                     st = time.time()
                     result = reach(current_pos=gripper_pos,
@@ -283,17 +283,15 @@ class SubGoalEnv(gym.Env):
                         a_star_final_pos += path
                         if not sub_actions:
                             numbers_no_path_found += 1
+                            # break
                     st = time.time()
                     obs, reward, done, info = self.env.step(sub_actions[0])
                     self.func_render_subactions()
                     time_in_mujoco += time.time() - st
-                gripper_pos = obs[:3]
+                # gripper_pos = obs[:3]
+                gripper_pos = obs["observation"][:3]
 
-            else:
-                # gripper_pos = self.env.tcp_center
-                # print("SUBGOAL --- Observation obs: ", obs)
-                # print("SUBGOAL --- Observation obs[:3]: ", obs[:3])
-                # print("SUBGOAL --- Observation obs[observation][:3]: ", obs["observation"][:3])
+            else: # self.env_name != "obstacle_env":
                 gripper_pos = obs[:3]
                 step_size = 0.01
                 # measure the time spend in A* Search
@@ -313,14 +311,14 @@ class SubGoalEnv(gym.Env):
                         sub_actions = [[0, 0, 0, -1]]
                     for i, a in enumerate(sub_actions):
                         st = time.time()
-                        print("SUBGOAL self.env type = ", type(self.env))
-                        obs, reward, done, info = self.env.teleport(sub_actions[-1], list(
-                            map(lambda x, y: x + y, gripper_pos, sub_actions[-1])))
+                        # obs, reward, done, info = self.env.teleport(sub_actions[-1], list(
+                        #     map(lambda x, y: x + y, gripper_pos, sub_actions[-1])))
+                        obs, reward, done, info = self.env.step(a)
                         self.func_render_subactions()
                         time_in_mujoco += time.time() - st
                 else:
                     if self.teleporting is None:
-                        sub_actions = teleport(current_pos=gripper_pos,
+                        sub_actions_teleport = teleport(current_pos=gripper_pos,
                                                         goal_pos=sub_goal_pos,
                                                         gripper_closed=gripper_closed,
                                                         obstacles=obstacles,
@@ -328,11 +326,8 @@ class SubGoalEnv(gym.Env):
                                                         step_size=0.01,
                                                         distance_pruned=True)
 
-                        #print(f"teleport return {sub_actions}")
-                        new_pos = [list(map(lambda x, y: x + y, gripper_pos, sub_actions[-1]))]
-                        #print(f"we want to append {new_pos} to go from {gripper_pos} to {sub_goal_pos}")
+                        new_pos = [list(map(lambda x, y: x + y, gripper_pos, sub_actions_teleport[-1]))]
                         teleport_final_pos += new_pos
-                        #print(f"teleport is now {teleport_final_pos}")
                     st = time.time()
                     result = reach(current_pos=gripper_pos,
                                    goal_pos=sub_goal_pos,
@@ -350,6 +345,7 @@ class SubGoalEnv(gym.Env):
                         a_star_final_pos += path
                         if not sub_actions:
                             numbers_no_path_found += 1
+                            # break
 
                     for i, a in enumerate(sub_actions):
                         st = time.time()
@@ -377,7 +373,7 @@ class SubGoalEnv(gym.Env):
         info['distance_to_goal'] = distance_to_goal
         info['initial_pos'] = initial_pos
         info['subgoal_pos'] = sub_goal_pos
-        # info['action_is_goal_pos'] = action_is_goal
+        info['action_is_goal_pos'] = action_is_goal
         info['a_search_path'] = a_star_final_pos
         info['teleport_path'] = teleport_final_pos
         # calculate reward

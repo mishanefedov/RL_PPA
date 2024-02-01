@@ -160,11 +160,8 @@ class RLPPAMonitor(VecEnvWrapper):
 
     def step_wait(self) -> VecEnvStepReturn:
         # set up start time to calculate how much time we spend in self.venv.step_wait()
-        print("RLPPAMonitor Step Wait")
         st = time.time()
         obs, rewards, dones, infos = self.venv.step_wait()
-        print("Observation: ", obs)
-        print("Observation type: ", type(obs))
         et = time.time()
         self.total_time_subgoal += et - st
         self.episode_returns += rewards
@@ -197,7 +194,7 @@ class RLPPAMonitor(VecEnvWrapper):
                                     "distance_to_goal": info['distance_to_goal'],
                                     "initial_pos": info['initial_pos'],
                                     "subgoal_pos": info['subgoal_pos'],
-                                    # "action_is_goal_pos": info['action_is_goal_pos'],
+                                    "action_is_goal_pos": info['action_is_goal_pos'],
                                     'total_dis_offset': self.distance_offsets[i],
                                     'a_search_path': self.a_star_paths[i],
                                     'teleport_path': self.teleport_paths[i],
@@ -213,7 +210,7 @@ class RLPPAMonitor(VecEnvWrapper):
                             info['distance_to_goal'],
                             info['initial_pos'],
                             info['subgoal_pos'],
-                            # info['action_is_goal_pos'],
+                            info['action_is_goal_pos'],
                             self.distance_offsets[i],
                             self.a_star_paths[i],
                             self.teleport_paths[i],
@@ -227,7 +224,7 @@ class RLPPAMonitor(VecEnvWrapper):
                                     "distance_to_goal": info['distance_to_goal'],
                                     "initial_pos": info['initial_pos'],
                                     "subgoal_pos": info['subgoal_pos'],
-                                    # "action_is_goal_pos": info['action_is_goal_pos'],
+                                    "action_is_goal_pos": info['action_is_goal_pos'],
                                     'total_dis_offset': self.distance_offsets[i],
                                     'a_search_path': self.a_star_paths[i],
                                     'teleport_path': self.teleport_paths[i],
@@ -242,7 +239,7 @@ class RLPPAMonitor(VecEnvWrapper):
                             info['distance_to_goal'],
                             info['initial_pos'],
                             info['subgoal_pos'],
-                            # info['action_is_goal_pos'],
+                            info['action_is_goal_pos'],
                             self.distance_offsets[i],
                             self.a_star_paths[i],
                             self.teleport_paths[i],

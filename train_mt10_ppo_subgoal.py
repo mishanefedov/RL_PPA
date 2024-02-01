@@ -38,9 +38,7 @@ def train():
     # create or load model
     model = PPO('MlpPolicy', env_vec, verbose=1, tensorboard_log=logdir, n_steps=timestamps,
                 batch_size=batch_size, )
-    # model = PPO.load("models/PPO3/538804224.zip", env=env_vec, tensorboard_log=logdir)
-    print("model.env: ", model.env)
-    print("model.env type: ", type(model.env))
+    # model = PPO.load("models/PPO/534528.zip", env=env_vec, tensorboard_log=logdir)
     # safe models
     i = 0
     while True:
@@ -55,7 +53,7 @@ def make_env(name,rew_type,number_of_one_hot_tasks, one_hot_task_index):
 
     def _init():
         return SubGoalEnv(env=name, rew_type=rew_type, number_of_one_hot_tasks=number_of_one_hot_tasks,
-                          one_hot_task_index=one_hot_task_index)
+                          one_hot_task_index=one_hot_task_index, teleporting=True)
     return _init
 
 
