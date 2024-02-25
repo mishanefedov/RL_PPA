@@ -29,7 +29,8 @@ def teleport(current_pos, goal_pos, gripper_closed, env_dimension, obstacles=Non
                                         env_dimension=env_dimension,
                                         distance_pruned=distance_pruned,
                                         return_path=False)
-    return trajectory_planner.teleporting_search()
+    # return trajectory_planner.teleporting_search()
+    return trajectory_planner.teleport_like_a_start()
 
 
 def random_choice(current_pos, goal_pos, gripper_closed, env_dimension, obstacles=None, step_size=0.01,
@@ -190,6 +191,30 @@ class FindTrajectory:
                         adjacent_nodes.append(new_node)
         return adjacent_nodes
 
+    def next_node_for_teleporting(self, node: Node, time_step) -> [Node]:
+        '''
+            This function returns a node that is the closest to self.goal_pos.
+            Use this method for environments with no obstacles 
+        '''
+        possible_nodes = self.get_possible_adjacent_nodes(node=node, time_step=time_step)
+        closest_node = None
+        min_distance = float('inf')
+        
+        goal_pos_array = np.array(self.goal_pos)
+        
+        for next_node in possible_nodes:
+            node_pos_array = np.array(next_node.pos)
+            
+            # Euclidean distance
+            distance = np.linalg.norm(node_pos_array - goal_pos_array)
+            
+            # Update closest_node
+            if distance < min_distance:
+                closest_node = next_node
+                min_distance = distance
+                
+        return closest_node
+
     def heuristic(self, node: Node) -> float:
         for i in range(3):
             node.h += abs(node.pos[i] - self.goal_pos[i])
@@ -280,9 +305,30 @@ class FindTrajectory:
             return self.trajectory_to_actions(path)  # Return path (reverse in A*)
         else:
             return []
+        
+    def teleport_like_a_start(self):
+        # create a start node
+        start_node = Node(None, self.start_pos)
+        self.safety_margin = self.og_safety_margin
+        if self.obstacles and self.obstacles.collides_at_time_step(start_node.pos, 0, self.safety_margin):
+            self.safety_margin = 0.02
+        
+        # Create intermediate nodes
+        path = [start_node]
+        current_node = start_node
+        for _ in range(16):
+            next_node = self.next_node_for_teleporting(current_node, current_node.depth)
+            if next_node is None:
+                return self.a_star_search()
+            path.append(next_node)
+            if self.is_nearest_node_to_goal(next_node):
+                break
+            else:
+                current_node = next_node
+        return self.trajectory_to_actions(path)
 
 
-    def a_star_search(self):
+    def a_star_search(self, max_path_length=15):
         # Create start  node
         start_node = Node(None, self.start_pos)
         self.safety_margin = self.og_safety_margin
@@ -309,7 +355,7 @@ class FindTrajectory:
             closed_dic[min_key] = current_node
 
             # Found the goal or maximum depth reached
-            if self.is_nearest_node_to_goal(current_node) or current_node.depth > 15:
+            if self.is_nearest_node_to_goal(current_node) or current_node.depth > max_path_length:
                 path = []
                 current = current_node
                 while current is not None:
