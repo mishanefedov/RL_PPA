@@ -1,0 +1,6 @@
+models/
+logs/
+.vscode/
+.idea/
+__pycache__/
+.DS_Store
