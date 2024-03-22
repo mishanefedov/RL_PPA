@@ -6,11 +6,13 @@ import metaworld
 from gym.spaces import Box
 # from GripperControl import reach, Obstacles
 # from GripperControl import Obstacles
-import gripper_control_module
 from ObstacleEnviroments.fetch.pick_dyn_obstacles2 import FetchPickDynObstaclesEnv2, pretty_obs
+try:
+    import gripper_control_module
+except:
+    print("Failed to include C++ GripperControl module. Compile if with: \n\n c++ -O3 -Wall -shared -std=c++11 -fPIC `python3 -m pybind11 --includes` gripper_control_bindings.cpp -o gripper_control_module`python3-config --extension-suffix`")
 
-
-def reach(current_pos, goal_pos, gripper_closed, env_dimension, obstacles=None, step_size= 0.01) -> [[float]]:
+def reach(current_pos, goal_pos, gripper_closed, env_dimension, obstacles=None, step_size= 0.01, teleporting = True) -> [[float]]:
     obstacles_list = [] if obstacles is None else obstacles
     if len(obstacles_list) == 0:
         mock_obstacle = gripper_control_module.Obstacle(
@@ -30,7 +32,10 @@ def reach(current_pos, goal_pos, gripper_closed, env_dimension, obstacles=None, 
         safety_margin,
         gripper_closed
     )
-    return trajectory_planner.aStarSearch()
+    if teleporting:
+        return trajectory_planner.teleportSearch()
+    else:
+        return trajectory_planner.aStarSearch()
 
 class SubGoalEnv(gym.Env):
     def __init__(self, env="reach-v2", render_subactions=False, rew_type="",

@@ -16,5 +16,6 @@ PYBIND11_MODULE(gripper_control_module, m) {
                       float, float, bool>(), 
             py::arg("start"), py::arg("goal"), py::arg("obstacles"), py::arg("env_dimension"),
             py::arg("stepSize"), py::arg("safetyMargin"), py::arg("gripperClosed"))
-        .def("aStarSearch", &FindTrajectory::aStarSearch);
+        .def("aStarSearch", &FindTrajectory::aStarSearch)
+        .def("teleportSearch", &FindTrajectory::teleportSearch);
 }

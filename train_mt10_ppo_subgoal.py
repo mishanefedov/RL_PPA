@@ -32,9 +32,9 @@ def train():
     env_vec = RLPPAMonitor(env_vec, "logs/PPO_0", multi_env=True, num_tasks=10)
 
     # create or load model
-    # model = PPO('MlpPolicy', env_vec, verbose=1, tensorboard_log=logdir, n_steps=timestamps,
-    #             batch_size=batch_size, )
-    model = PPO.load("models/PPO/14254080.zip", env=env_vec, tensorboard_log=logdir)
+    model = PPO('MlpPolicy', env_vec, verbose=1, tensorboard_log=logdir, n_steps=timestamps,
+                batch_size=batch_size, )
+    # model = PPO.load("models/PPO/14254080.zip", env=env_vec, tensorboard_log=logdir)
 
     # safe models
     i = 0

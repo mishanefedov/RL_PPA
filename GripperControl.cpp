@@ -113,6 +113,31 @@ public:
     : start(start), goal(goal), obstacles(obstacles), env_dimension(env_dimension),
       stepSize(stepSize), safetyMargin(safetyMargin), gripperClosed(gripperClosed) {}
 
+
+    std::vector<std::vector<float>> teleportSearch() {
+        if (!isPositionInBound(goal)) {
+            return {};
+        }
+        auto startNode = std::make_shared<Node>(start);
+        
+        std::vector<std::vector<float>> path = {startNode->pos};
+        auto currentNode = startNode;
+        for (int i = 0; i < 16; ++i) {
+            auto nextNode = std::make_shared<Node>(nextTeleportingNode(currentNode->pos, i));
+
+            if (nextNode == nullptr) {
+                return aStarSearch();
+            }
+            path.push_back(nextNode->pos);
+            if (isNearestNodeToGoal(nextNode->pos)) {
+                break;
+            } else {
+                currentNode = nextNode;
+            }
+        }
+        return trajectoryToActions(path);
+    }
+
     std::vector<std::vector<float>> aStarSearch() {
         if (!isPositionInBound(goal)) {
             return {};
@@ -130,8 +155,7 @@ public:
             auto current = openSet.top();
             openSet.pop();
 
-            // if (current->pos == goal) {
-            if (isNearestNodeToGoal(current.get()) || current->depth > 15) {
+            if (isNearestNodeToGoal(current.get()->pos) || current->depth > 15) {
                 std::vector<std::vector<float>> path;
                 for (auto node = current; node != nullptr; node = node->parent) {
                     path.push_back(node->pos);
@@ -158,6 +182,22 @@ public:
 
 
 private:
+    std::vector<float> nextTeleportingNode(const std::vector<float>& pos, const int depth = 0) {
+        std::vector<std::vector<float>> neighbors = getNeighbors(pos, depth);
+        std::vector<float>* closest_pos = nullptr;
+        float min_distance = std::numeric_limits<float>::infinity();
+        
+        for (auto& next_pos : neighbors) {
+            float distance = euclideanDistance(next_pos, pos);
+            
+            if (distance < min_distance) {
+                closest_pos = &next_pos;
+                min_distance = distance;
+            }
+        }
+        
+        return *closest_pos;
+    }
     std::vector<float> roundAction(std::vector<float> action, int n) {
         std::vector<float> roundedAction;
         float multiplier = std::pow(10.0, n);
@@ -188,8 +228,8 @@ private:
         
         return actions;
     }
-    bool isNearestNodeToGoal(const Node* node) const {
-        return euclideanDistance(node->pos, goal) < stepSize - 0.00;
+    bool isNearestNodeToGoal(std::vector<float> nodePos) const {
+        return euclideanDistance(nodePos, goal) < stepSize - 0.00;
     }
 
     float euclideanDistance(const std::vector<float>& pos1, const std::vector<float>& pos2) const {
@@ -208,7 +248,6 @@ private:
         }
         return h;
     }
-
 
     std::vector<std::vector<float>> getNeighbors(const std::vector<float>& pos, const int depth = 0) const {
         std::vector<std::vector<float>> neighbors;
